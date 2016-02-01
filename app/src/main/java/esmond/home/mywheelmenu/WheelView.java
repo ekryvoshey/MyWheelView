@@ -13,6 +13,8 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 
+import java.util.ArrayList;
+
 public class WheelView extends View {
     private final String ON_TOUCH_ACTION_DEBUG_TAG = "touch action";
     private final String VELOCITY_TRACKER_DEBUG_TAG = "action velocity";
@@ -22,6 +24,7 @@ public class WheelView extends View {
     private VelocityTracker mVelocityTracker = null;
     private Context context;
     private RectF oval;
+    private ArrayList<String> items;
 
     private Paint mainPaint;
     private Paint fillerPaint;
@@ -57,7 +60,12 @@ public class WheelView extends View {
         super(context, attrs);
         mDetector = new GestureDetector(context, new MyGestureDetector());
         setTextSize(18);
-        setTextColor(getResources().getColor(R.color.colorPrimary));
+        setTextColor(Color.rgb(250, 250, 250));
+        items = new ArrayList<String>();
+        for (int i = 0; i < segmentsQnt; i++){
+            String label = "Label " + (i + 1);
+            items.add(label);
+        }
 
         this.setOnTouchListener(new OnTouchListener() {
             @Override
@@ -195,12 +203,9 @@ public class WheelView extends View {
             startAngle -= sweepAngle;
         }
         for (int i = 0; i < segmentsQnt; i++){
-
             canvas.rotate(sweepAngle);
-            String label = "Label "+ (i + 1);
             float pivot = Math.round(innerCircleRadius) + innerCircleRadius*0.5f;
-            canvas.drawText(label, pivot, -innerCircleRadius/6, textPaint);
-
+            canvas.drawText(items.get(i), pivot, -innerCircleRadius/6, textPaint);
         }
 
         // Set secondary inner circle to hide lines
