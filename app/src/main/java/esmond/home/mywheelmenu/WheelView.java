@@ -14,12 +14,12 @@ import android.view.View;
 
 public class WheelView extends View {
     private final String ROTATION_TRACKER_DEBUG_TAG = "rotation is";
-    private final String SELECTED_SEGMENT_DEBUG_TAG = "selected segment";
-    private final static int INTERVAL = 1000;
     private final GestureDetector mDetector;
 
     private WheelChangeListener wheelChangeListener;
     private RectF oval;
+    private String label;
+    private String[] menuItems;
 
     private Paint mainPaint;
     private Paint fillerPaint;
@@ -34,61 +34,64 @@ public class WheelView extends View {
     private int canvasCenterX;
     private int canvasCenterY;
     private int sectorsQnt;
+    private int selectedPosition;
 
     private float size;
+    private float startingPosition;
     private float innerCircleRadius;
     private float outerCircleRadius;
     private float fillerCircleRadius;
+    private float startAngle;
     private float sweepAngle;
     private float activeRotation;
-    private float startAngle;
-    private float screen_density = getContext().getResources().getDisplayMetrics().density;
 
     private double angleA;
     private double angleB;
 
     private boolean allowRotating = true;
-    private boolean[] mQuadrantTouched = new boolean[]{false, false, false, false, false};
 
     public WheelView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        startingPosition = 0.5f;
         sectorsQnt = 24;
         sweepAngle = 360 / sectorsQnt;
         mDetector = new GestureDetector(context, new MyGestureDetector());
-        this.setWheelChangeListener(new WheelChangeListener() {
-            @Override
-            public void onSelectionChange(int selectedPosition) {
-                Log.d(SELECTED_SEGMENT_DEBUG_TAG, "" + selectedPosition);
-            }
-        });
-        this.setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                int action = event.getActionMasked();
-                switch (action) {
-                    case MotionEvent.ACTION_DOWN:
-                        for (int i = 0; i < mQuadrantTouched.length; i++) {
-                            mQuadrantTouched[i] = false;
-                        }
-                        angleA = getAngle(event.getX(), event.getY());
-                        allowRotating = false;
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        angleB = getAngle(event.getX(), event.getY());
-                        activeRotation += (float) (angleA - angleB);
-                        angleA = angleB;
-                        Log.d(ROTATION_TRACKER_DEBUG_TAG, "onTouch: "+activeRotation);
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        allowRotating = true;
-                        break;
-                }
-                mDetector.onTouchEvent(event);
-                invalidate();
-                return true;
-            }
-        });
+        menuItems = new String[sectorsQnt];
+        for (int i = 0; i < menuItems.length; i++){
+            menuItems[i] = "Menu Item " + (i+1);
+        }
         initPaint();
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                angleA = getAngle(event.getX(), event.getY());
+                allowRotating = false;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                angleB = getAngle(event.getX(), event.getY());
+                activeRotation += (float) (angleA - angleB);
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "rotation is: " + activeRotation);
+                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle)+0.5f);
+                if (selectedPosition == sectorsQnt+1 || selectedPosition == 0){
+                    selectedPosition =1;
+                }
+                if (wheelChangeListener != null) {
+                    wheelChangeListener.onSelectionChange(selectedPosition);
+                }
+                angleA = angleB;
+                break;
+            case MotionEvent.ACTION_UP:
+                checkRotation();
+                allowRotating = true;
+                break;
+        }
+        mDetector.onTouchEvent(event);
+        invalidate();
+        return true;
     }
 
     @Override
@@ -101,15 +104,15 @@ public class WheelView extends View {
         screenCenterX = screenWidth / 2;
         screenCenterY = screenHeight / 2;
 
-        outerCircleRadius = size / 2;
+        outerCircleRadius = size / 1.5f;
         innerCircleRadius = size / 3.5f;
         fillerCircleRadius = size / 3.5f - 2;
 
         canvasWidth = canvas.getWidth();
         canvasHeight = canvas.getHeight();
 
-        canvasCenterX = canvasWidth / 2;
-        canvasCenterY = canvasHeight / 2;
+        canvasCenterX = 0;
+        canvasCenterY = screenCenterY;
 
         redrawCanvas(activeRotation, canvas);
         canvas.drawPath(setTriangle(35, 20, 0, 0), mainPaint);
@@ -118,8 +121,8 @@ public class WheelView extends View {
 
     public void redrawCanvas(float rotation, Canvas canvas) {
         canvas.save();
-        canvas.translate(screenCenterX, screenCenterY);
-        canvas.scale(1f, 1f, screenCenterX, screenCenterY);
+        canvas.translate(0, canvasCenterY);
+        canvas.scale(1f, 1f, canvasCenterX, canvasCenterY);
         canvas.rotate(rotation);
 
         // Set main circle
@@ -143,76 +146,53 @@ public class WheelView extends View {
         canvas.drawArc(oval, 0, 360, true, fillerPaint);
 
         // Set labels in segments
-        canvas.rotate(-sweepAngle * 3 / 2);
+        canvas.rotate(sweepAngle/ 2);
         for (int i = 0; i < sectorsQnt; i++) {
-            canvas.rotate(sweepAngle);
-            String label = "Item " + (i + 1);
-            float pivotX = Math.round(innerCircleRadius * 1.4f);
-            float pivotY = Math.round(5);
+            canvas.rotate(-sweepAngle);
+            label = menuItems[i];
+            int length = label.length();
+            if (length >= 14){
+                label = label.substring(0, 10)+" ...";
+            }
+            float pivotX = Math.round(innerCircleRadius * (1.5f + length*0.01f));
+            float pivotY = Math.round(sweepAngle*0.75f);
             canvas.drawText(label, pivotX, pivotY, textPaint);
         }
         canvas.restore();
-    }
-
-    public interface WheelChangeListener {
-        public void onSelectionChange(int selectedPosition);
     }
 
     private class MyGestureDetector extends GestureDetector.SimpleOnGestureListener {
 
         @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            // get the quadrant of the start and the end of the fling
-            int q1 = getQuadrant(e1.getX() - (canvasWidth / 2), canvasHeight - e1.getY() - (canvasHeight / 2));
-            int q2 = getQuadrant(e2.getX() - (canvasWidth / 2), canvasHeight - e2.getY() - (canvasHeight / 2));
-            // the inversed rotations
-            if ((q1 == 2 && q2 == 2 && Math.abs(velocityX) < Math.abs(velocityY))
-                    || (q1 == 3 && q2 == 3)
-                    || (q1 == 1 && q2 == 3)
-                    || (q1 == 4 && q2 == 4 && Math.abs(velocityX) > Math.abs(velocityY))
-                    || ((q1 == 2 && q2 == 3) || (q1 == 3 && q2 == 2))
-                    || ((q1 == 3 && q2 == 4) || (q1 == 4 && q2 == 3))
-                    || (q1 == 2 && q2 == 4 && mQuadrantTouched[3])
-                    || (q1 == 4 && q2 == 2 && mQuadrantTouched[3])) {
-                WheelView.this.post(new FlingRunnable(-1 * (velocityY)));
-            } else {
-
-                // the normal rotation
-                WheelView.this.post(new FlingRunnable(velocityY));
-            }
+            WheelView.this.post(new FlingRunnable((velocityY)));
             return true;
         }
     }
 
     private class FlingRunnable implements Runnable {
-        private boolean stopped = false;
         private float velocity;
 
         public FlingRunnable(float velocity) {
             this.velocity = velocity;
         }
+
         @Override
         public void run() {
-            setStopped(false);
             if (Math.abs(velocity) > 5 && allowRotating) {
                 activeRotation += velocity / 500;
                 invalidate();
-                velocity /= 1.1666F;
+                velocity /= 1.0666F;
+                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle)+0.5f);
+                if (selectedPosition == sectorsQnt+1 || selectedPosition == 0){
+                    selectedPosition =1;
+                }
+                checkRotation();
+                if (wheelChangeListener != null) {
+                    wheelChangeListener.onSelectionChange(selectedPosition);
+                }
                 WheelView.this.post(this);
             }
-        }
-
-        public boolean isStopped(){
-            return stopped;
-        }
-
-        public void setStopped(boolean stopped) {
-            if (this.stopped != stopped)
-            this.stopped = stopped;
-        }
-
-        public void stop(){
-            setStopped(true);
         }
     }
 
@@ -229,33 +209,19 @@ public class WheelView extends View {
 
         textPaint = new Paint();
         textPaint.setARGB(100, 0, 0, 0);
-        textPaint.setTextSize(24);
+        textPaint.setTextSize(34);
         textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     private double getAngle(double xTouch, double yTouch) {
         double x = xTouch - (canvasWidth / 2d);
         double y = canvasHeight - yTouch - (canvasHeight / 2d);
-        switch (getQuadrant(x, y)) {
-            case 1:
-                return Math.asin(y / Math.hypot(x, y)) * 180 / Math.PI;
-            case 2:
-                return 180 - Math.asin(y / Math.hypot(x, y)) * 180 / Math.PI;
-            case 3:
-                return 180 + (-1 * Math.asin(y / Math.hypot(x, y)) * 180 / Math.PI);
-            case 4:
-                return 360 + Math.asin(y / Math.hypot(x, y)) * 180 / Math.PI;
-            default:
-                return 0;
-        }
+        return Math.cos(y / Math.hypot(x, y)) * 180 / Math.PI;
     }
 
-    private static int getQuadrant(double x, double y) {
-        if (x >= 0) {
-            return y >= 0 ? 1 : 4;
-        } else {
-            return y >= 0 ? 2 : 3;
-        }
+    public int getSelectedPosition() {
+
+        return selectedPosition;
     }
 
     private Path setTriangle(int width, int height, int modX, int modY) {
@@ -274,7 +240,18 @@ public class WheelView extends View {
         return path;
     }
 
+    public interface WheelChangeListener {
+        public void onSelectionChange(int selectedPosition);
+    }
+
     public void setWheelChangeListener(WheelChangeListener wheelChangeListener) {
         this.wheelChangeListener = wheelChangeListener;
+    }
+
+    private void checkRotation() {
+        activeRotation = activeRotation % 360;
+        if (activeRotation < 0) {
+            activeRotation = 360 + activeRotation;
+        }
     }
 }
