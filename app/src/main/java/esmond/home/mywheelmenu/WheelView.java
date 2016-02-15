@@ -12,6 +12,10 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class WheelView extends View {
     private final String ROTATION_TRACKER_DEBUG_TAG = "rotation is";
     private final GestureDetector mDetector;
@@ -19,7 +23,6 @@ public class WheelView extends View {
     private WheelChangeListener wheelChangeListener;
     private RectF oval;
     private String label;
-    private String[] menuItems;
 
     private Paint mainPaint;
     private Paint fillerPaint;
@@ -49,17 +52,28 @@ public class WheelView extends View {
     private double angleB;
 
     private boolean allowRotating = true;
+    private boolean isDone = false;
+
+    private String[] cars = new String[]{
+            "Acura", "Alfa Romeo", "Audi", "Bentley", "BMW", "Bugatti", "Buick", "Cadillac",
+            "Chevrolet", "Chrysler", "Citroen", "Dodge", "Ferrari", "Fiat", "Ford", "Honda",
+            "Hyundai", "Infiniti", "Jaguar", "Jeep", "KIA", "Lamborghini", "Land Rover", "Lexus",
+            "Lincoln", "Maserati", "Mercedes-Benz", "Mini", "Nissan", "Peugeot", "Porsche",
+            "Renault", "Rolls-Royce", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
+    };
+    private List<String> menuItems;
+    private List<String> actualItems;
 
     public WheelView(Context context, AttributeSet attrs) {
         super(context, attrs);
         startingPosition = 0.5f;
-        sectorsQnt = 24;
+        sectorsQnt = 18;
         sweepAngle = 360 / sectorsQnt;
         mDetector = new GestureDetector(context, new MyGestureDetector());
-        menuItems = new String[sectorsQnt];
-        for (int i = 0; i < menuItems.length; i++){
-            menuItems[i] = "Menu Item " + (i+1);
-        }
+        menuItems = new ArrayList<>();
+        actualItems = Arrays.asList(cars);
+
+        initLists();
         initPaint();
     }
 
@@ -74,10 +88,9 @@ public class WheelView extends View {
             case MotionEvent.ACTION_MOVE:
                 angleB = getAngle(event.getX(), event.getY());
                 activeRotation += (float) (angleA - angleB);
-                Log.d(ROTATION_TRACKER_DEBUG_TAG, "rotation is: " + activeRotation);
-                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle)+0.5f);
-                if (selectedPosition == sectorsQnt+1 || selectedPosition == 0){
-                    selectedPosition =1;
+                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle) + 0.5f);
+                if (selectedPosition == sectorsQnt + 1 || selectedPosition == 0) {
+                    selectedPosition = 1;
                 }
                 if (wheelChangeListener != null) {
                     wheelChangeListener.onSelectionChange(selectedPosition);
@@ -104,14 +117,14 @@ public class WheelView extends View {
         screenCenterX = screenWidth / 2;
         screenCenterY = screenHeight / 2;
 
-        outerCircleRadius = size / 1.5f;
-        innerCircleRadius = size / 3.5f;
-        fillerCircleRadius = size / 3.5f - 2;
+        outerCircleRadius = size / 2f;
+        innerCircleRadius = size / 4f;
+        fillerCircleRadius = size / 4f - 2;
 
         canvasWidth = canvas.getWidth();
         canvasHeight = canvas.getHeight();
 
-        canvasCenterX = 0;
+        canvasCenterX = screenCenterX;
         canvasCenterY = screenCenterY;
 
         redrawCanvas(activeRotation, canvas);
@@ -121,7 +134,7 @@ public class WheelView extends View {
 
     public void redrawCanvas(float rotation, Canvas canvas) {
         canvas.save();
-        canvas.translate(0, canvasCenterY);
+        canvas.translate(canvasCenterX, canvasCenterY);
         canvas.scale(1f, 1f, canvasCenterX, canvasCenterY);
         canvas.rotate(rotation);
 
@@ -146,16 +159,16 @@ public class WheelView extends View {
         canvas.drawArc(oval, 0, 360, true, fillerPaint);
 
         // Set labels in segments
-        canvas.rotate(sweepAngle/ 2);
+        canvas.rotate(sweepAngle / 2);
         for (int i = 0; i < sectorsQnt; i++) {
             canvas.rotate(-sweepAngle);
-            label = menuItems[i];
+            label = menuItems.get(i);
             int length = label.length();
-            if (length >= 14){
-                label = label.substring(0, 10)+" ...";
+            if (length >= 14) {
+                label = label.substring(0, 10) + " ...";
             }
-            float pivotX = Math.round(innerCircleRadius * (1.5f + length*0.01f));
-            float pivotY = Math.round(sweepAngle*0.75f);
+            float pivotX = Math.round(innerCircleRadius * (1.5f + length * 0.005f));
+            float pivotY = Math.round(sweepAngle / 2);
             canvas.drawText(label, pivotX, pivotY, textPaint);
         }
         canvas.restore();
@@ -183,11 +196,12 @@ public class WheelView extends View {
                 activeRotation += velocity / 500;
                 invalidate();
                 velocity /= 1.0666F;
-                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle)+0.5f);
-                if (selectedPosition == sectorsQnt+1 || selectedPosition == 0){
-                    selectedPosition =1;
+                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle) + 0.5f);
+                if (selectedPosition == sectorsQnt + 1 || selectedPosition == 0) {
+                    selectedPosition = 1;
                 }
                 checkRotation();
+                changeListItem();
                 if (wheelChangeListener != null) {
                     wheelChangeListener.onSelectionChange(selectedPosition);
                 }
@@ -209,7 +223,7 @@ public class WheelView extends View {
 
         textPaint = new Paint();
         textPaint.setARGB(100, 0, 0, 0);
-        textPaint.setTextSize(34);
+        textPaint.setTextSize(20);
         textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
@@ -254,4 +268,50 @@ public class WheelView extends View {
             activeRotation = 360 + activeRotation;
         }
     }
+
+    private void initLists() {
+        menuItems = new ArrayList<>();
+        actualItems = Arrays.asList(cars);
+
+        int k = sectorsQnt;
+
+        for (int i = 0; i < k; i++) {
+            menuItems.add(i, actualItems.get(i));
+//            menuItems.add(i, "Menu Item " +(i+1));
+        }
+    }
+
+    private void changeListItem() {
+        int c;
+        int i;
+        int k = menuItems.size();
+        int j = actualItems.size();
+
+        i = Math.round(activeRotation / sweepAngle)+1;
+        Log.d(ROTATION_TRACKER_DEBUG_TAG, "current position is: "+i);
+        if (selectedPosition <= k / 2) {
+            c = selectedPosition + k / 2;
+        } else if (selectedPosition > k / 2) {
+            c = selectedPosition - k / 2;
+        } else c = k / 2;
+
+//        Log.d(ROTATION_TRACKER_DEBUG_TAG, "changeble position: "+c);
+        for (int m = 0; m < j-k; m++){
+            if(!isDone){
+                if (i >= c & c < c+1) {
+                    menuItems.set(c-1, actualItems.get(k+m));
+                    Log.d(ROTATION_TRACKER_DEBUG_TAG, "activeRotation: " + activeRotation);
+                    Log.d(ROTATION_TRACKER_DEBUG_TAG, "list item: "+c+ " changed to: " + actualItems.get(k));
+                    isDone = true;
+                }
+            }
+//            if (isDone){
+//                if (i >= c+1){
+//                    isDone = false;
+//                }
+//            }
+        }
+
+    }
 }
+
