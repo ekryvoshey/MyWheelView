@@ -21,11 +21,11 @@ public class MainActivity extends AppCompatActivity {
         initCarsList();
         wheelView = (WheelView)findViewById(R.id.wheelView);
         textView = (TextView)findViewById(R.id.textView);
-        textView.setText("You selected: " + "\n"+wheelView.getSelectedPosition());
+        textView.setText("You selected: " + "\n"+WheelView.menuItems.get(wheelView.getSelectedPosition()));
         wheelView.setWheelChangeListener(new WheelView.WheelChangeListener() {
             @Override
             public void onSelectionChange(int selectedPosition) {
-                textView.setText("You selected: " + "\n" + wheelView.getSelectedPosition());
+                textView.setText("You selected: " + "\n" +WheelView.menuItems.get(wheelView.getSelectedPosition()-1));
             }
         });
     }

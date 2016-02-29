@@ -38,6 +38,7 @@ public class WheelView extends View {
     private int canvasCenterY;
     private int sectorsQnt;
     private int selectedPosition;
+    int selectedPositionIndex;
 
     private float size;
     private float startingPosition;
@@ -47,12 +48,12 @@ public class WheelView extends View {
     private float startAngle;
     private float sweepAngle;
     private float activeRotation;
+    private float newRotation;
 
     private double angleA;
     private double angleB;
 
     private boolean allowRotating = true;
-    private boolean isDone = false;
 
     private String[] cars = new String[]{
             "Acura", "Alfa Romeo", "Audi", "Bentley", "BMW", "Bugatti", "Buick", "Cadillac",
@@ -61,8 +62,9 @@ public class WheelView extends View {
             "Lincoln", "Maserati", "Mercedes-Benz", "Mini", "Nissan", "Peugeot", "Porsche",
             "Renault", "Rolls-Royce", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
     };
-    private List<String> menuItems;
-    private List<String> actualItems;
+    public static List<String> menuItems;
+    public static List<String> actualItems;
+
 
     public WheelView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -88,10 +90,7 @@ public class WheelView extends View {
             case MotionEvent.ACTION_MOVE:
                 angleB = getAngle(event.getX(), event.getY());
                 activeRotation += (float) (angleA - angleB);
-                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle) + 0.5f);
-                if (selectedPosition == sectorsQnt + 1 || selectedPosition == 0) {
-                    selectedPosition = 1;
-                }
+                changeListItem();
                 if (wheelChangeListener != null) {
                     wheelChangeListener.onSelectionChange(selectedPosition);
                 }
@@ -130,6 +129,7 @@ public class WheelView extends View {
         redrawCanvas(activeRotation, canvas);
         canvas.drawPath(setTriangle(35, 20, 0, 0), mainPaint);
         canvas.drawPath(setTriangle(35, 20, -2, 0), fillerPaint);
+        changeListItem();
     }
 
     public void redrawCanvas(float rotation, Canvas canvas) {
@@ -164,7 +164,7 @@ public class WheelView extends View {
             canvas.rotate(-sweepAngle);
             label = menuItems.get(i);
             int length = label.length();
-            if (length >= 14) {
+            if (length >= 15) {
                 label = label.substring(0, 10) + " ...";
             }
             float pivotX = Math.round(innerCircleRadius * (1.5f + length * 0.005f));
@@ -194,14 +194,11 @@ public class WheelView extends View {
         public void run() {
             if (Math.abs(velocity) > 5 && allowRotating) {
                 activeRotation += velocity / 500;
+                newRotation += velocity / 500;
                 invalidate();
                 velocity /= 1.0666F;
-                selectedPosition = Math.round(startingPosition + (activeRotation / sweepAngle) + 0.5f);
-                if (selectedPosition == sectorsQnt + 1 || selectedPosition == 0) {
-                    selectedPosition = 1;
-                }
-                checkRotation();
                 changeListItem();
+                checkRotation();
                 if (wheelChangeListener != null) {
                     wheelChangeListener.onSelectionChange(selectedPosition);
                 }
@@ -267,51 +264,63 @@ public class WheelView extends View {
         if (activeRotation < 0) {
             activeRotation = 360 + activeRotation;
         }
+        newRotation = newRotation % (actualItems.size() * sweepAngle);
     }
 
     private void initLists() {
-        menuItems = new ArrayList<>();
-        actualItems = Arrays.asList(cars);
-
         int k = sectorsQnt;
 
-        for (int i = 0; i < k; i++) {
-            menuItems.add(i, actualItems.get(i));
-//            menuItems.add(i, "Menu Item " +(i+1));
+        menuItems = new ArrayList<>(k);
+        actualItems = Arrays.asList(cars);
+
+        for (int i = 0; i < k; i++){
+            menuItems.add(i, "");
+        }
+        for (int i = 0; i < k/2; i++) {
+            menuItems.set(i, actualItems.get(i));
+        }
+        for (int i = 0; i < k/2; i++){
+            menuItems.set(k-i-1, actualItems.get(actualItems.size()-i-1));
         }
     }
 
     private void changeListItem() {
         int c;
-        int i;
+        int i = selectedPosition;
         int k = menuItems.size();
         int j = actualItems.size();
+        int p = sectorsQnt;
 
-        i = Math.round(activeRotation / sweepAngle)+1;
-        Log.d(ROTATION_TRACKER_DEBUG_TAG, "current position is: "+i);
-        if (selectedPosition <= k / 2) {
-            c = selectedPosition + k / 2;
-        } else if (selectedPosition > k / 2) {
-            c = selectedPosition - k / 2;
+
+        if (i <= k / 2) {
+            c = i + k / 2;
+        } else if (i > k / 2) {
+            c = i - k / 2;
         } else c = k / 2;
 
-//        Log.d(ROTATION_TRACKER_DEBUG_TAG, "changeble position: "+c);
-        for (int m = 0; m < j-k; m++){
-            if(!isDone){
-                if (i >= c & c < c+1) {
-                    menuItems.set(c-1, actualItems.get(k+m));
-                    Log.d(ROTATION_TRACKER_DEBUG_TAG, "activeRotation: " + activeRotation);
-                    Log.d(ROTATION_TRACKER_DEBUG_TAG, "list item: "+c+ " changed to: " + actualItems.get(k));
-                    isDone = true;
-                }
-            }
-//            if (isDone){
-//                if (i >= c+1){
-//                    isDone = false;
-//                }
-//            }
+        int previousPosition = selectedPosition;
+        selectedPosition = Math.round(activeRotation / sweepAngle)+1;
+        if (selectedPosition == sectorsQnt + 1 || selectedPosition == 0) {
+            selectedPosition = 1;
         }
 
+        if(previousPosition != selectedPosition){
+            int g = actualItems.indexOf(menuItems.get(this.getSelectedPosition()-1))+1;
+//            if (g < 0){
+//                g = g + sectorsQnt;
+//            }
+            if(previousPosition < selectedPosition) {
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "previousPosition: "+previousPosition);
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "selectedPosition: " + selectedPosition);
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "g: " + g);
+//                    menuItems.set(c, actualItems.get(g+p/2-1));
+            } else {
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "previousPosition: "+previousPosition);
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "selectedPosition: " + selectedPosition);
+                Log.d(ROTATION_TRACKER_DEBUG_TAG, "g: " + g);
+                menuItems.set(c - 1, actualItems.get(j-p/2-(j-g)));
+            }
+        }
     }
 }
 
